@@ -1,0 +1,26 @@
+name: 'shiny-template'
+channels:
+  - conda-forge
+dependencies:
+  - numpy
+  - plotly
+  - matplotlib
+  - pandas
+  - python
+  - ipykernel
+  - seaborn
+  - scienceplots
+  - scikit-learn
+  - nbformat
+  - shiny
+  - pycountry
+  - shinywidgets
+  - anywidget
+  - python-dotenv
+  - pip
+  - pytest
+  - pytest-playwright
+  - ibis-duckdb
+  - pip:
+    - chatlas
+    - querychat
