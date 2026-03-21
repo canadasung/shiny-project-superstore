@@ -13,7 +13,7 @@ from ibis import _
 
 load_dotenv()
 
-anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+# anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
 
 # ==========================================
 #   SETUP & DATA LOADING
@@ -114,9 +114,9 @@ elif os.environ.get("GITHUB_TOKEN"):
     llm_client = clt.ChatGithub(model="gpt-4o-mini")
     ACTIVE_MODEL = "Cloud: GitHub (GPT-4o-Mini)"
     
-elif os.environ.get("ANTHROPIC_API_KEY"):
-    llm_client = clt.ChatAnthropic(model="claude-haiku-4-5-20251001") 
-    ACTIVE_MODEL = "Cloud: Anthropic (Claude Haiku 4.5)"
+# elif os.environ.get("ANTHROPIC_API_KEY"):
+#     llm_client = clt.ChatAnthropic(model="claude-haiku-4-5-20251001") 
+#     ACTIVE_MODEL = "Cloud: Anthropic (Claude Haiku 4.5)"
 
 else:
     llm_client = None
@@ -442,33 +442,6 @@ app_ui = ui.page_fluid(
 #   SERVER LOGIC
 # ==========================================
 def server(input, output, session):    
-    def toggle_region(region):
-        """Toggle a region selection in the checkbox group.
-
-        If the given region is currently selected, it is removed.
-        Otherwise, it is added to the current selection.
-    
-        Parameters
-        ----------
-        region : str
-            The name of the region to toggle.
-    
-        Returns
-        -------
-        None
-        """
-        current = list(input.input_region())
-    
-        if region in current:
-            current.remove(region)
-        else:
-            current.append(region)
-        
-        ui.update_checkbox_group(
-            "input_region",
-            selected=current,
-            session=session
-        )
 
     # ----------------------------------------
     # TAB 1 LOGIC (Main Dashboard)
@@ -497,324 +470,353 @@ def server(input, output, session):
     
         return table
     
-    # 2) Materialize filtered data only when needed
-    @reactive.Calc
-    def filtered_df():
-        """Execute the lazy query and return pandas DataFrame.
-        
-        This is called only when the data is actually needed for visualization.
-        
-        Returns
-        -------
-        pd.DataFrame
-            The filtered world education dataframe
-        """
-        return filtered_table().execute()
-        
-    @render.text
-    def literacy_coverage_note():
-        d = filtered_df()
-    
-        if d.empty:
-            return "Please select at least one region to display data."
-    
-        required_cols = [
-            "Youth_15_24_Literacy_Rate_Male",
-            "Youth_15_24_Literacy_Rate_Female",
-        ]
-    
-        shown = d.dropna(subset=required_cols).shape[0]
-        total = len(d)
-    
-        return f"Showing {shown} of {total} countries with available literacy data"
-        
-    @reactive.Calc
-    def selected_metric():
-        return input.input_map_metric()
-    
-    @reactive.Calc
-    def filtered_metric_series():
-        """Return non-missing values of the selected metric for filtered data.
 
-        Returns
-        -------
-        pd.Series
-            A pandas Series containing non-null values of the currently
-            selected metric for the region-filtered dataset.
-        """
-        d = filtered_df()
-        metric = selected_metric()
-        return d[metric].dropna()
-    
-    @reactive.Calc
-    def global_metric_series():
-        """Get global metric values using lazy query."""
-        metric = selected_metric()
-        # Query only the needed column from the full dataset
-        global_data = education_table.select(metric).execute()
-        return global_data[metric].dropna()
-    
-    @reactive.Calc
-    def sex_completion_rate_df():
-        """Melt columns with data about education level completion.
+    # def toggle_region(region):
+    # """Toggle a region selection in the checkbox group.
 
-        This makes it possible create education_level_by_gender_bar bar plot.
+    # If the given region is currently selected, it is removed.
+    # Otherwise, it is added to the current selection.
+
+    # Parameters
+    # ----------
+    # region : str
+    #     The name of the region to toggle.
+
+    # Returns
+    # -------
+    # None
+    # """
+    # current = list(input.input_region())
+
+    # if region in current:
+    #     current.remove(region)
+    # else:
+    #     current.append(region)
+    
+    # ui.update_checkbox_group(
+    #     "input_region",
+    #     selected=current,
+    #     session=session
+    # )
+
+    # # 2) Materialize filtered data only when needed
+    # @reactive.Calc
+    # def filtered_df():
+    #     """Execute the lazy query and return pandas DataFrame.
+        
+    #     This is called only when the data is actually needed for visualization.
+        
+    #     Returns
+    #     -------
+    #     pd.DataFrame
+    #         The filtered world education dataframe
+    #     """
+    #     return filtered_table().execute()
+        
+    # @render.text
+    # def literacy_coverage_note():
+    #     d = filtered_df()
+    
+    #     if d.empty:
+    #         return "Please select at least one region to display data."
+    
+    #     required_cols = [
+    #         "Youth_15_24_Literacy_Rate_Male",
+    #         "Youth_15_24_Literacy_Rate_Female",
+    #     ]
+    
+    #     shown = d.dropna(subset=required_cols).shape[0]
+    #     total = len(d)
+    
+    #     return f"Showing {shown} of {total} countries with available literacy data"
+        
+    # @reactive.Calc
+    # def selected_metric():
+    #     return input.input_map_metric()
+    
+    # @reactive.Calc
+    # def filtered_metric_series():
+    #     """Return non-missing values of the selected metric for filtered data.
+
+    #     Returns
+    #     -------
+    #     pd.Series
+    #         A pandas Series containing non-null values of the currently
+    #         selected metric for the region-filtered dataset.
+    #     """
+    #     d = filtered_df()
+    #     metric = selected_metric()
+    #     return d[metric].dropna()
+    
+    # @reactive.Calc
+    # def global_metric_series():
+    #     """Get global metric values using lazy query."""
+    #     metric = selected_metric()
+    #     # Query only the needed column from the full dataset
+    #     global_data = education_table.select(metric).execute()
+    #     return global_data[metric].dropna()
+    
+    # @reactive.Calc
+    # def sex_completion_rate_df():
+    #     """Melt columns with data about education level completion.
+
+    #     This makes it possible create education_level_by_gender_bar bar plot.
             
-        Parameters
-        ----------
-        None
+    #     Parameters
+    #     ----------
+    #     None
 
-        Returns
-        -------
-        pd.Dataframe
-            The melted dataframe
-        """
-        d = filtered_df().copy()
+    #     Returns
+    #     -------
+    #     pd.Dataframe
+    #         The melted dataframe
+    #     """
+    #     d = filtered_df().copy()
     
-        return create_sex_completion_rate_df(d)
+    #     return create_sex_completion_rate_df(d)
     
-    @reactive.Calc
-    def region_completion_rate_df():
-        """Melt columns with data about education level completion.
+    # @reactive.Calc
+    # def region_completion_rate_df():
+    #     """Melt columns with data about education level completion.
 
-        This makes it possible create education_level_by_region_bar bar plot.
+    #     This makes it possible create education_level_by_region_bar bar plot.
             
-        Parameters
-        ----------
-        None
+    #     Parameters
+    #     ----------
+    #     None
 
-        Returns
-        -------
-        pd.Dataframe
-            The melted dataframe
-        """
-        d = filtered_df().copy()
+    #     Returns
+    #     -------
+    #     pd.Dataframe
+    #         The melted dataframe
+    #     """
+    #     d = filtered_df().copy()
     
-        d = d[[
-                "Completion_Avg_Primary",
-                "Completion_Avg_Lower_Secondary",
-                "Completion_Avg_Upper_Secondary",
-                "Region",
-                "iso3"
-            ]]
-        d = pd.melt(
-            d, 
-            id_vars=["Region", "iso3"], 
-            value_vars=[
-                "Completion_Avg_Primary",
-                "Completion_Avg_Lower_Secondary",
-                "Completion_Avg_Upper_Secondary",
-            ],
-            value_name="Completion_Rate",
-            var_name="Completion_Rate_Group",
-            ignore_index=True
-            )
+    #     d = d[[
+    #             "Completion_Avg_Primary",
+    #             "Completion_Avg_Lower_Secondary",
+    #             "Completion_Avg_Upper_Secondary",
+    #             "Region",
+    #             "iso3"
+    #         ]]
+    #     d = pd.melt(
+    #         d, 
+    #         id_vars=["Region", "iso3"], 
+    #         value_vars=[
+    #             "Completion_Avg_Primary",
+    #             "Completion_Avg_Lower_Secondary",
+    #             "Completion_Avg_Upper_Secondary",
+    #         ],
+    #         value_name="Completion_Rate",
+    #         var_name="Completion_Rate_Group",
+    #         ignore_index=True
+    #         )
 
-        d["Education_Level"] = d["Completion_Rate_Group"].str.split("_").str[2:].str.join(" ")
+    #     d["Education_Level"] = d["Completion_Rate_Group"].str.split("_").str[2:].str.join(" ")
     
-        d = (
-            d[["Region", "Education_Level", "Completion_Rate"]]
-            .groupby(["Region", "Education_Level"])
-            .mean()
-            .reset_index()
-        )
+    #     d = (
+    #         d[["Region", "Education_Level", "Completion_Rate"]]
+    #         .groupby(["Region", "Education_Level"])
+    #         .mean()
+    #         .reset_index()
+    #     )
 
-        return d
+    #     return d
 
-    @reactive.Calc
-    def completion_gap_by_region_df():
-        """
-        Create dataframe of completion rate gender gap by region and education level.
+    # @reactive.Calc
+    # def completion_gap_by_region_df():
+    #     """
+    #     Create dataframe of completion rate gender gap by region and education level.
                 
-        Parameters
-        ----------
-        None
+    #     Parameters
+    #     ----------
+    #     None
 
-        Returns
-        -------
-        pd.Dataframe
-            The melted dataframe
+    #     Returns
+    #     -------
+    #     pd.Dataframe
+    #         The melted dataframe
             
-        """
+    #     """
         
-        d = filtered_df().copy()
+    #     d = filtered_df().copy()
     
-        d = d[
-            [
-                "Region",
-                "Completion_Gap_Primary",
-                "Completion_Gap_Lower_Secondary",
-                "Completion_Gap_Upper_Secondary",
-            ]
-        ]
+    #     d = d[
+    #         [
+    #             "Region",
+    #             "Completion_Gap_Primary",
+    #             "Completion_Gap_Lower_Secondary",
+    #             "Completion_Gap_Upper_Secondary",
+    #         ]
+    #     ]
     
-        d = pd.melt(
-            d,
-            id_vars=["Region"],
-            value_vars=[
-                "Completion_Gap_Primary",
-                "Completion_Gap_Lower_Secondary",
-                "Completion_Gap_Upper_Secondary",
-            ],
-            var_name="Gap_Group",
-            value_name="Completion_Rate_Gap",
-            ignore_index=True,
-        )
+    #     d = pd.melt(
+    #         d,
+    #         id_vars=["Region"],
+    #         value_vars=[
+    #             "Completion_Gap_Primary",
+    #             "Completion_Gap_Lower_Secondary",
+    #             "Completion_Gap_Upper_Secondary",
+    #         ],
+    #         var_name="Gap_Group",
+    #         value_name="Completion_Rate_Gap",
+    #         ignore_index=True,
+    #     )
     
-        d["Education_Level"] = (
-            d["Gap_Group"]
-            .str.replace("Completion_Gap_", "", regex=False)
-            .str.replace("_", " ", regex=False)
-        )
+    #     d["Education_Level"] = (
+    #         d["Gap_Group"]
+    #         .str.replace("Completion_Gap_", "", regex=False)
+    #         .str.replace("_", " ", regex=False)
+    #     )
     
-        d = (
-            d.groupby(["Region", "Education_Level"], as_index=False)["Completion_Rate_Gap"]
-            .mean()
-        )
+    #     d = (
+    #         d.groupby(["Region", "Education_Level"], as_index=False)["Completion_Rate_Gap"]
+    #         .mean()
+    #     )
     
-        return d
+    #     return d
         
-    @reactive.Calc
-    def no_region_selected():
-        """Check whether no regions are currently selected.
+    # @reactive.Calc
+    # def no_region_selected():
+    #     """Check whether no regions are currently selected.
 
-        Returns
-        -------
+    #     Returns
+    #     -------
         bool
             True if no region is selected, otherwise False.
         """
         return len(input.input_region()) == 0
 
     # 3) Create object to display
-    @output
-    @render_widget
-    def world_map():
-        """Create interactive world map figure.
+    # @output
+    # @render_widget
+    # def world_map():
+    #     """Create interactive world map figure.
 
-        Returns
-        -------
-        plotly.express.chorpleth
-            Interactive world map figure.
-        """
-        if no_region_selected():
-            fig = px.choropleth(title="Please select at least one region to display data")
-            fig.update_layout(height=450)
-            return fig
+    #     Returns
+    #     -------
+    #     plotly.express.chorpleth
+    #         Interactive world map figure.
+    #     """
+    #     if no_region_selected():
+    #         fig = px.choropleth(title="Please select at least one region to display data")
+    #         fig.update_layout(height=450)
+    #         return fig
 
-        d = filtered_df()
-        metric = input.input_map_metric()
-        clean_label = metric_label(metric)
+    #     d = filtered_df()
+    #     metric = input.input_map_metric()
+    #     clean_label = metric_label(metric)
         
-        # DYNAMIC COLOR SCALE: Reverse the colors for negative metrics (OOSR)
-        if metric.startswith("OOSR_"):
-            map_colors = "viridis_r"  # Reversed: High is dark/blue, Low is bright/yellow
-        else:
-            map_colors = "viridis"
+    #     # DYNAMIC COLOR SCALE: Reverse the colors for negative metrics (OOSR)
+    #     if metric.startswith("OOSR_"):
+    #         map_colors = "viridis_r"  # Reversed: High is dark/blue, Low is bright/yellow
+    #     else:
+    #         map_colors = "viridis"
 
-        fig = px.choropleth(
-            d, 
-            locations="iso3", 
-            hover_name="Countries and areas",
-            color=metric,
-            color_continuous_scale=map_colors,
-            projection="natural earth",
-            labels={metric: clean_label}
-        )
+    #     fig = px.choropleth(
+    #         d, 
+    #         locations="iso3", 
+    #         hover_name="Countries and areas",
+    #         color=metric,
+    #         color_continuous_scale=map_colors,
+    #         projection="natural earth",
+    #         labels={metric: clean_label}
+    #     )
 
-        fig.update_geos(
-            showcoastlines=True,
-            showcountries=True,
-            showframe=False
-        )
+    #     fig.update_geos(
+    #         showcoastlines=True,
+    #         showcountries=True,
+    #         showframe=False
+    #     )
 
-        fig.update_layout(
-            margin=dict(l=0, r=0, t=30, b=90),
-            height=450,
-            coloraxis_colorbar=dict(
-                orientation="h",
-                x=0.5,
-                xanchor="center",
-                y=-0.22,
-                yanchor="top",
-                len=0.75,
-                thickness=14
-            )
-        )
+    #     fig.update_layout(
+    #         margin=dict(l=0, r=0, t=30, b=90),
+    #         height=450,
+    #         coloraxis_colorbar=dict(
+    #             orientation="h",
+    #             x=0.5,
+    #             xanchor="center",
+    #             y=-0.22,
+    #             yanchor="top",
+    #             len=0.75,
+    #             thickness=14
+    #         )
+    #     )
 
-        return fig
+    #     return fig
     
-    @output
-    @render_plotly
-    def literacy_scatterplot():
-        """Create scatterplot of male vs female literacy rates by region.
+    # @output
+    # @render_plotly
+    # def literacy_scatterplot():
+    #     """Create scatterplot of male vs female literacy rates by region.
 
-        Parameters
-        ----------
-        None
+    #     Parameters
+    #     ----------
+    #     None
 
-        Returns
-        -------
-        plotly.express.scatter
-            Scatterplot of male vs female literacy rate by region.
-        """
-        if no_region_selected():
-            fig = px.scatter(title="Please select at least one region to display data")
-            return fig
+    #     Returns
+    #     -------
+    #     plotly.express.scatter
+    #         Scatterplot of male vs female literacy rate by region.
+    #     """
+    #     if no_region_selected():
+    #         fig = px.scatter(title="Please select at least one region to display data")
+    #         return fig
             
-        d = filtered_df()
-        plot_df = d.dropna(subset=[
-            "Youth_15_24_Literacy_Rate_Male",
-            "Youth_15_24_Literacy_Rate_Female",
-        ])
+    #     d = filtered_df()
+    #     plot_df = d.dropna(subset=[
+    #         "Youth_15_24_Literacy_Rate_Male",
+    #         "Youth_15_24_Literacy_Rate_Female",
+    #     ])
         
-        if plot_df.empty:
-            fig = px.scatter(title="No literacy data available for the selected region(s)").update_layout(title_font_size=12)
-            return fig
+    #     if plot_df.empty:
+    #         fig = px.scatter(title="No literacy data available for the selected region(s)").update_layout(title_font_size=12)
+    #         return fig
 
-        fig = px.scatter(
-            plot_df,
-            x="Youth_15_24_Literacy_Rate_Male",
-            y="Youth_15_24_Literacy_Rate_Female",
-            color="Region",
-            hover_name="Countries and areas",
-            custom_data=["Region"],
-            color_discrete_map=region_color_map,
-            category_orders={"Region": region_choices},
-            labels={
-                "Region": "Region",
-                "Youth_15_24_Literacy_Rate_Male": " Male Literacy Rate (%)",
-                "Youth_15_24_Literacy_Rate_Female": "Female Literacy Rate (%)",
-            }
-        )
+    #     fig = px.scatter(
+    #         plot_df,
+    #         x="Youth_15_24_Literacy_Rate_Male",
+    #         y="Youth_15_24_Literacy_Rate_Female",
+    #         color="Region",
+    #         hover_name="Countries and areas",
+    #         custom_data=["Region"],
+    #         color_discrete_map=region_color_map,
+    #         category_orders={"Region": region_choices},
+    #         labels={
+    #             "Region": "Region",
+    #             "Youth_15_24_Literacy_Rate_Male": " Male Literacy Rate (%)",
+    #             "Youth_15_24_Literacy_Rate_Female": "Female Literacy Rate (%)",
+    #         }
+    #     )
 
-        xy_min = plot_df[["Youth_15_24_Literacy_Rate_Male", "Youth_15_24_Literacy_Rate_Female"]].min().min() - 5
-        xy_max = plot_df[["Youth_15_24_Literacy_Rate_Male", "Youth_15_24_Literacy_Rate_Female"]].max().max() + 5
+    #     xy_min = plot_df[["Youth_15_24_Literacy_Rate_Male", "Youth_15_24_Literacy_Rate_Female"]].min().min() - 5
+    #     xy_max = plot_df[["Youth_15_24_Literacy_Rate_Male", "Youth_15_24_Literacy_Rate_Female"]].max().max() + 5
 
-        # Add 45-degree diagonal line (y = x)
-        fig.add_shape(
-            type="line",
-            x0=-10, y0=-10,
-            x1=110, y1=110,
-            line=dict(color="black", dash="dash")
-        )
+    #     # Add 45-degree diagonal line (y = x)
+    #     fig.add_shape(
+    #         type="line",
+    #         x0=-10, y0=-10,
+    #         x1=110, y1=110,
+    #         line=dict(color="black", dash="dash")
+    #     )
 
-        # Tidy axis
-        axis_range = xy_max-xy_min
-        if axis_range < 15:
-            tick_size = 2
-        elif axis_range < 40:
-            tick_size = 5
-        else:
-            tick_size = 10
-        fig.update_xaxes(dtick=tick_size)
-        fig.update_yaxes(dtick=tick_size)
-        fig.update_layout(
-            xaxis=dict(range=[xy_min, xy_max]),  # x scale follows y
-            yaxis=dict(range=[xy_min, xy_max])
-        )
-        fig.update_traces(marker_size=8) # make marker point size larger
+    #     # Tidy axis
+    #     axis_range = xy_max-xy_min
+    #     if axis_range < 15:
+    #         tick_size = 2
+    #     elif axis_range < 40:
+    #         tick_size = 5
+    #     else:
+    #         tick_size = 10
+    #     fig.update_xaxes(dtick=tick_size)
+    #     fig.update_yaxes(dtick=tick_size)
+    #     fig.update_layout(
+    #         xaxis=dict(range=[xy_min, xy_max]),  # x scale follows y
+    #         yaxis=dict(range=[xy_min, xy_max])
+    #     )
+    #     fig.update_traces(marker_size=8) # make marker point size larger
 
-        return fig
+    #     return fig
 
     @reactive.effect
     def _capture_scatter_click():
@@ -890,243 +892,243 @@ def server(input, output, session):
             height="300px"
         )
 
-    @output
-    @render_plotly
-    def completion_rate_gap_by_region_bar():
-        """Create bar plot of completion rate gender gap by region.
+    # @output
+    # @render_plotly
+    # def completion_rate_gap_by_region_bar():
+    #     """Create bar plot of completion rate gender gap by region.
 
-        Parameters
-        ----------
-        None
+    #     Parameters
+    #     ----------
+    #     None
 
-        Returns
-        -------
-        px.bar
-            Plotly express bar plot object.
+    #     Returns
+    #     -------
+    #     px.bar
+    #         Plotly express bar plot object.
         
-        """
-        if no_region_selected():
-            fig = px.bar(title="Please select at least one region to display data").update_layout(title_font_size=12)
-            return fig
+    #     """
+    #     if no_region_selected():
+    #         fig = px.bar(title="Please select at least one region to display data").update_layout(title_font_size=12)
+    #         return fig
             
-        d = completion_gap_by_region_df()
+    #     d = completion_gap_by_region_df()
     
-        fig = px.bar(
-            d,
-            x="Education_Level",
-            y="Completion_Rate_Gap",
-            color="Region",
-            custom_data=["Region"],
-            color_discrete_map=region_color_map,
-            barmode="group",
-            category_orders={
-                "Education_Level": ["Primary", "Lower Secondary", "Upper Secondary"],
-                "Region": region_choices,
-            },
-            labels={
-                "Education_Level": "Education Level",
-                "Completion_Rate_Gap": "Completion Rate Gap (Male - Female, %)",
-            },
-        )
+    #     fig = px.bar(
+    #         d,
+    #         x="Education_Level",
+    #         y="Completion_Rate_Gap",
+    #         color="Region",
+    #         custom_data=["Region"],
+    #         color_discrete_map=region_color_map,
+    #         barmode="group",
+    #         category_orders={
+    #             "Education_Level": ["Primary", "Lower Secondary", "Upper Secondary"],
+    #             "Region": region_choices,
+    #         },
+    #         labels={
+    #             "Education_Level": "Education Level",
+    #             "Completion_Rate_Gap": "Completion Rate Gap (Male - Female, %)",
+    #         },
+    #     )
     
-        fig.add_hline(y=0, line_dash="dash", line_color="black")
+    #     fig.add_hline(y=0, line_dash="dash", line_color="black")
 
-        # ADD THESE TWO LINES: Vertical separators between categories
-        fig.add_vline(x=0.5, line_width=1, line_dash="dash", line_color="gray", opacity=0.5)
-        fig.add_vline(x=1.5, line_width=1, line_dash="dash", line_color="gray", opacity=0.5)
+    #     # ADD THESE TWO LINES: Vertical separators between categories
+    #     fig.add_vline(x=0.5, line_width=1, line_dash="dash", line_color="gray", opacity=0.5)
+    #     fig.add_vline(x=1.5, line_width=1, line_dash="dash", line_color="gray", opacity=0.5)
 
-        fig.update_yaxes(dtick=2)
+    #     fig.update_yaxes(dtick=2)
     
-        return fig
+    #     return fig
         
-    @reactive.effect
-    def _capture_gap_bar_click():
-        fig = completion_rate_gap_by_region_bar.widget
-        if fig is None:
-            return
+    # @reactive.effect
+    # def _capture_gap_bar_click():
+    #     fig = completion_rate_gap_by_region_bar.widget
+    #     if fig is None:
+    #         return
     
-        for trace in fig.data:
-            trace._click_callbacks.clear()
+    #     for trace in fig.data:
+    #         trace._click_callbacks.clear()
     
-            def handle_click(trace, points, state):
-                if not points.point_inds:
-                    return
-                if trace.customdata is None:
-                    return
+    #         def handle_click(trace, points, state):
+    #             if not points.point_inds:
+    #                 return
+    #             if trace.customdata is None:
+    #                 return
             
-                idx = points.point_inds[0]
-                region = trace.customdata[idx][0]
-                toggle_region(region)
+    #             idx = points.point_inds[0]
+    #             region = trace.customdata[idx][0]
+    #             toggle_region(region)
     
-            trace.on_click(handle_click)
+    #         trace.on_click(handle_click)
     
-    @output
-    @render_plotly
-    def education_level_by_region_bar():
-        """Create bar plot of education level completed separated by region.
+    # @output
+    # @render_plotly
+    # def education_level_by_region_bar():
+    #     """Create bar plot of education level completed separated by region.
 
-        Parameters
-        ----------
-        None
+    #     Parameters
+    #     ----------
+    #     None
 
-        Returns
-        -------
-        px.bar
-            Plotly express bar plot object.
-        """
-        if no_region_selected():
-            fig = px.bar(title="Please select at least one region to display data")
-            return fig
+    #     Returns
+    #     -------
+    #     px.bar
+    #         Plotly express bar plot object.
+    #     """
+    #     if no_region_selected():
+    #         fig = px.bar(title="Please select at least one region to display data")
+    #         return fig
             
-        d = region_completion_rate_df()
+    #     d = region_completion_rate_df()
     
-        fig = px.bar(
-            d,
-            x="Education_Level",
-            y="Completion_Rate",
-            color="Region",
-            custom_data=["Region"],
-            color_discrete_map=region_color_map,
-            barmode="group",
-            category_orders={
-                "Education_Level": ["Primary", "Lower Secondary", "Upper Secondary"],
-                "Region": region_choices,
-            },
-            labels={
-                "Education_Level": "Education Level",
-                "Completion_Rate": "Completion Rate (%)"
-            },
-            range_y=[0, 100]
-        )
+    #     fig = px.bar(
+    #         d,
+    #         x="Education_Level",
+    #         y="Completion_Rate",
+    #         color="Region",
+    #         custom_data=["Region"],
+    #         color_discrete_map=region_color_map,
+    #         barmode="group",
+    #         category_orders={
+    #             "Education_Level": ["Primary", "Lower Secondary", "Upper Secondary"],
+    #             "Region": region_choices,
+    #         },
+    #         labels={
+    #             "Education_Level": "Education Level",
+    #             "Completion_Rate": "Completion Rate (%)"
+    #         },
+    #         range_y=[0, 100]
+    #     )
 
-        # ADD THESE TWO LINES: Vertical separators between categories
-        fig.add_vline(x=0.5, line_width=1, line_dash="dash", line_color="gray", opacity=0.5)
-        fig.add_vline(x=1.5, line_width=1, line_dash="dash", line_color="gray", opacity=0.5)
+    #     # ADD THESE TWO LINES: Vertical separators between categories
+    #     fig.add_vline(x=0.5, line_width=1, line_dash="dash", line_color="gray", opacity=0.5)
+    #     fig.add_vline(x=1.5, line_width=1, line_dash="dash", line_color="gray", opacity=0.5)
     
-        fig.update_yaxes(dtick=20)
+    #     fig.update_yaxes(dtick=20)
     
-        return fig
+    #     return fig
 
-    @reactive.effect
-    def _capture_completion_bar_click():
-        fig = education_level_by_region_bar.widget
-        if fig is None:
-            return
+    # @reactive.effect
+    # def _capture_completion_bar_click():
+    #     fig = education_level_by_region_bar.widget
+    #     if fig is None:
+    #         return
     
-        for trace in fig.data:
-            trace._click_callbacks.clear()
+    #     for trace in fig.data:
+    #         trace._click_callbacks.clear()
     
-            def handle_click(trace, points, state):
-                if not points.point_inds:
-                    return
-                if trace.customdata is None:
-                    return
+    #         def handle_click(trace, points, state):
+    #             if not points.point_inds:
+    #                 return
+    #             if trace.customdata is None:
+    #                 return
             
-                idx = points.point_inds[0]
-                region = trace.customdata[idx][0]
-                toggle_region(region)
+    #             idx = points.point_inds[0]
+    #             region = trace.customdata[idx][0]
+    #             toggle_region(region)
     
-            trace.on_click(handle_click)
+    #         trace.on_click(handle_click)
     
-    # KPI 1
-    @render.ui
-    def metric_average_box():
-        metric = selected_metric()
-        label = metric_label(metric)
-        values = filtered_metric_series()
+    # # KPI 1
+    # @render.ui
+    # def metric_average_box():
+    #     metric = selected_metric()
+    #     label = metric_label(metric)
+    #     values = filtered_metric_series()
     
-        if len(values) == 0:
-            return ui.value_box(
-                f"Average: {label}",
-                "No data",
-                theme="secondary"
-            )
+    #     if len(values) == 0:
+    #         return ui.value_box(
+    #             f"Average: {label}",
+    #             "No data",
+    #             theme="secondary"
+    #         )
     
-        avg_value = values.mean()
+    #     avg_value = values.mean()
     
-        return ui.value_box(
-            f"Average: {label}",
-            f"{avg_value:.1f}",
-            ui.HTML("<strong style='opacity:0.9'>Across selected regions</strong>"),
-            theme="primary"
-        )
-    #KPI Card 2
-    @render.ui
-    def metric_vs_world_box():
-        metric = selected_metric()
-        label = metric_label(metric)
-        filtered_values = filtered_metric_series()
-        global_values = global_metric_series()
+    #     return ui.value_box(
+    #         f"Average: {label}",
+    #         f"{avg_value:.1f}",
+    #         ui.HTML("<strong style='opacity:0.9'>Across selected regions</strong>"),
+    #         theme="primary"
+    #     )
+    # #KPI Card 2
+    # @render.ui
+    # def metric_vs_world_box():
+    #     metric = selected_metric()
+    #     label = metric_label(metric)
+    #     filtered_values = filtered_metric_series()
+    #     global_values = global_metric_series()
     
-        if len(filtered_values) == 0 or len(global_values) == 0:
-            return ui.value_box(
-                f"Vs world average: {label}",
-                "No data",
-                theme="secondary"
-            )
+    #     if len(filtered_values) == 0 or len(global_values) == 0:
+    #         return ui.value_box(
+    #             f"Vs world average: {label}",
+    #             "No data",
+    #             theme="secondary"
+    #         )
     
-        filtered_avg = filtered_values.mean()
-        global_avg = global_values.mean()
-        diff = filtered_avg - global_avg
+    #     filtered_avg = filtered_values.mean()
+    #     global_avg = global_values.mean()
+    #     diff = filtered_avg - global_avg
     
-        if diff >= 0:
-            caption = f"{diff:.1f} above world average ({global_avg:.1f})"
-        else:
-            caption = f"{-diff:.1f} below world average ({global_avg:.1f})"
+    #     if diff >= 0:
+    #         caption = f"{diff:.1f} above world average ({global_avg:.1f})"
+    #     else:
+    #         caption = f"{-diff:.1f} below world average ({global_avg:.1f})"
     
-        theme = "success" if abs(diff) < 1 else "warning"
+    #     theme = "success" if abs(diff) < 1 else "warning"
     
-        return ui.value_box(
-            f"Vs world average: {label}",
-            f"{diff:+.1f}",
-            ui.HTML(f"<strong style='opacity:0.9'>{caption}</strong>"),
-            theme=theme
-        )
-    # KPI Card 3
-    @render.ui
-    def metric_coverage_box():
-        metric = selected_metric()
-        label = metric_label(metric)
-        d = filtered_df()
+    #     return ui.value_box(
+    #         f"Vs world average: {label}",
+    #         f"{diff:+.1f}",
+    #         ui.HTML(f"<strong style='opacity:0.9'>{caption}</strong>"),
+    #         theme=theme
+    #     )
+    # # KPI Card 3
+    # @render.ui
+    # def metric_coverage_box():
+    #     metric = selected_metric()
+    #     label = metric_label(metric)
+    #     d = filtered_df()
     
-        n_available = d[metric].notna().sum()
-        n_total = len(d)
+    #     n_available = d[metric].notna().sum()
+    #     n_total = len(d)
     
-        if n_total == 0:
-            return ui.value_box(
-                f"Data coverage: {label}",
-                "No data",
-                theme="secondary"
-            )
+    #     if n_total == 0:
+    #         return ui.value_box(
+    #             f"Data coverage: {label}",
+    #             "No data",
+    #             theme="secondary"
+    #         )
     
-        pct = 100 * n_available / n_total
+    #     pct = 100 * n_available / n_total
     
-        return ui.value_box(
-            f"Data coverage: {label}",
-            f"{n_available}/{n_total}",
-            ui.HTML(f"<strong style='opacity:0.9'>{pct:.0f}% of selected countries have data</strong>"),
-            theme="info"
-        )
+    #     return ui.value_box(
+    #         f"Data coverage: {label}",
+    #         f"{n_available}/{n_total}",
+    #         ui.HTML(f"<strong style='opacity:0.9'>{pct:.0f}% of selected countries have data</strong>"),
+    #         theme="info"
+    #     )
     
-    @reactive.effect
-    @reactive.event(input.select_all_regions)
-    def _select_all_regions():
+    # @reactive.effect
+    # @reactive.event(input.select_all_regions)
+    # def _select_all_regions():
     
-        ui.update_checkbox_group(
-            "input_region",
-            selected=region_choices,
-            session=session
-        )
+    #     ui.update_checkbox_group(
+    #         "input_region",
+    #         selected=region_choices,
+    #         session=session
+    #     )
 
-    @reactive.effect
-    @reactive.event(input.reset_regions)
-    def _reset_regions():
+    # @reactive.effect
+    # @reactive.event(input.reset_regions)
+    # def _reset_regions():
     
-        ui.update_checkbox_group(
-            "input_region",
-            selected=[],
-            session=session
-        )
+    #     ui.update_checkbox_group(
+    #         "input_region",
+    #         selected=[],
+    #         session=session
+    #     )
 
     # ----------------------------------------
     # TAB 2 LOGIC (QueryChat)
@@ -1136,7 +1138,7 @@ def server(input, output, session):
 
         @render.text
         def chat_title():
-            return qc_vals.title() or "Global Education Dataset"
+            return qc_vals.title() or "Superstore Dataset"
 
         @output
         @render.data_frame
@@ -1177,136 +1179,137 @@ def server(input, output, session):
                 height="250px"
             )
 
-    # Chat plots - work for both cases
-    @output
-    @render_plotly
-    def chat_scatter():
-        """
-        Create scatterplot of male vs female literacy rates by region,
-        and filtered by user feed AI commands.
+    # # Chat plots - work for both cases
+    # @output
+    # @render_plotly
+    # def chat_scatter():
+    #     """
+    #     Create scatterplot of male vs female literacy rates by region,
+    #     and filtered by user feed AI commands.
 
-        Parameters
-        ----------
-        None
+    #     Parameters
+    #     ----------
+    #     None
 
-        Returns
-        -------
-        plotly.express.scatter
-            Scatterplot of male vs female literacy rate by region.
-        """
-        if qc is None:
-            return px.scatter(title="LLM Not Configured")
+    #     Returns
+    #     -------
+    #     plotly.express.scatter
+    #         Scatterplot of male vs female literacy rate by region.
+    #     """
+    #     if qc is None:
+    #         return px.scatter(title="LLM Not Configured")
             
-        d = qc_vals.df()
-        if d.empty:
-            return px.scatter(title="No Data Available for this query")
+    #     d = qc_vals.df()
+    #     if d.empty:
+    #         return px.scatter(title="No Data Available for this query")
             
-        fig = px.scatter(
-            d, 
-            x="Youth_15_24_Literacy_Rate_Male", 
-            y="Youth_15_24_Literacy_Rate_Female",
-            color="Region", 
-            hover_name="Countries and areas", 
-            color_discrete_sequence=px.colors.qualitative.Set2,
-            labels={
-                "Region": "Region", 
-                "Youth_15_24_Literacy_Rate_Male": " Male Literacy Rate (%)", 
-                "Youth_15_24_Literacy_Rate_Female": "Female Literacy Rate (%)"
-            }
-        )
+    #     fig = px.scatter(
+    #         d, 
+    #         x="Youth_15_24_Literacy_Rate_Male", 
+    #         y="Youth_15_24_Literacy_Rate_Female",
+    #         color="Region", 
+    #         hover_name="Countries and areas", 
+    #         color_discrete_sequence=px.colors.qualitative.Set2,
+    #         labels={
+    #             "Region": "Region", 
+    #             "Youth_15_24_Literacy_Rate_Male": " Male Literacy Rate (%)", 
+    #             "Youth_15_24_Literacy_Rate_Female": "Female Literacy Rate (%)"
+    #         }
+    #     )
 
-        xy_min = d[["Youth_15_24_Literacy_Rate_Male", "Youth_15_24_Literacy_Rate_Female"]].min().min() - 5
-        xy_max = d[["Youth_15_24_Literacy_Rate_Male", "Youth_15_24_Literacy_Rate_Female"]].max().max() + 5
+    #     xy_min = d[["Youth_15_24_Literacy_Rate_Male", "Youth_15_24_Literacy_Rate_Female"]].min().min() - 5
+    #     xy_max = d[["Youth_15_24_Literacy_Rate_Male", "Youth_15_24_Literacy_Rate_Female"]].max().max() + 5
 
-        # Add 45-degree diagonal line (y = x)
-        fig.add_shape(
-            type="line",
-            x0=-10, y0=-10,
-            x1=110, y1=110,
-            line=dict(color="black", dash="dash")
-        )
+    #     # Add 45-degree diagonal line (y = x)
+    #     fig.add_shape(
+    #         type="line",
+    #         x0=-10, y0=-10,
+    #         x1=110, y1=110,
+    #         line=dict(color="black", dash="dash")
+    #     )
 
-        # Tidy axis
-        axis_range = xy_max-xy_min
-        if axis_range < 15:
-            tick_size = 2
-        elif axis_range < 40:
-            tick_size = 5
-        else:
-            tick_size = 10
-        fig.update_xaxes(dtick=tick_size)
-        fig.update_yaxes(dtick=tick_size)
-        fig.update_layout(
-            xaxis=dict(range=[xy_min, xy_max]),  # x scale follows y
-            yaxis=dict(range=[xy_min, xy_max])
-        )
+    #     # Tidy axis
+    #     axis_range = xy_max-xy_min
+    #     if axis_range < 15:
+    #         tick_size = 2
+    #     elif axis_range < 40:
+    #         tick_size = 5
+    #     else:
+    #         tick_size = 10
+    #     fig.update_xaxes(dtick=tick_size)
+    #     fig.update_yaxes(dtick=tick_size)
+    #     fig.update_layout(
+    #         xaxis=dict(range=[xy_min, xy_max]),  # x scale follows y
+    #         yaxis=dict(range=[xy_min, xy_max])
+    #     )
 
-        fig.update_traces(marker_size=8) # make marker point size larger
+    #     fig.update_traces(marker_size=8) # make marker point size larger
 
-        return fig
+    #     return fig
 
-    @output
-    @render_plotly
-    def chat_bar():
-        """
-        Create bar plot of education level completed separated by region,
-        and filtered by user feed AI command.
+    # @output
+    # @render_plotly
+    # def chat_bar():
+    #     """
+    #     Create bar plot of education level completed separated by region,
+    #     and filtered by user feed AI command.
 
-        Parameters
-        ----------
-        None
+    #     Parameters
+    #     ----------
+    #     None
 
-        Returns
-        -------
-        px.bar
-            Plotly express bar plot object.
-        """
-        if qc is None:
-            return px.bar(title="LLM Not Configured")
+    #     Returns
+    #     -------
+    #     px.bar
+    #         Plotly express bar plot object.
+    #     """
+    #     if qc is None:
+    #         return px.bar(title="LLM Not Configured")
             
-        d = qc_vals.df()
-        if d.empty:
-            return px.bar(title="No Data Available for this query")
+    #     d = qc_vals.df()
+    #     if d.empty:
+    #         return px.bar(title="No Data Available for this query")
             
-        d_melt = d[[
-            "Completion_Avg_Primary", 
-            "Completion_Avg_Lower_Secondary",
-            "Completion_Avg_Upper_Secondary", 
-            "Region", 
-            "iso3"
-        ]].copy()
+    #     d_melt = d[[
+    #         "Completion_Avg_Primary", 
+    #         "Completion_Avg_Lower_Secondary",
+    #         "Completion_Avg_Upper_Secondary", 
+    #         "Region", 
+    #         "iso3"
+    #     ]].copy()
         
-        d_melt = pd.melt(
-            d_melt, 
-            id_vars=["Region", "iso3"], 
-            value_vars=[
-                "Completion_Avg_Primary", 
-                "Completion_Avg_Lower_Secondary", 
-                "Completion_Avg_Upper_Secondary",
-            ],
-            value_name="Completion_Rate", 
-            var_name="Completion_Rate_Group", 
-            ignore_index=True
-        )
-        d_melt["Education_Level"] = d_melt["Completion_Rate_Group"].str.split("_").str[2:].str.join(" ")
+    #     d_melt = pd.melt(
+    #         d_melt, 
+    #         id_vars=["Region", "iso3"], 
+    #         value_vars=[
+    #             "Completion_Avg_Primary", 
+    #             "Completion_Avg_Lower_Secondary", 
+    #             "Completion_Avg_Upper_Secondary",
+    #         ],
+    #         value_name="Completion_Rate", 
+    #         var_name="Completion_Rate_Group", 
+    #         ignore_index=True
+    #     )
+    #     d_melt["Education_Level"] = d_melt["Completion_Rate_Group"].str.split("_").str[2:].str.join(" ")
         
-        d_grouped = d_melt[["Region", "Education_Level", "Completion_Rate"]].groupby(["Region", "Education_Level"]).mean().reset_index()
+    #     d_grouped = d_melt[["Region", "Education_Level", "Completion_Rate"]].groupby(["Region", "Education_Level"]).mean().reset_index()
 
-        fig = px.bar(
-            d_grouped, 
-            x="Education_Level", 
-            y="Completion_Rate", 
-            color="Region",
-            color_discrete_sequence=px.colors.qualitative.Set2, barmode="group",
-            category_orders={"Education_Level": ["Primary", "Lower Secondary", "Upper Secondary"]},
-            labels={"Education_Level": "Education Level", "Completion_Rate": "Completion Rate (%)"},
-            range_y=[0,100]
-        )
+    #     fig = px.bar(
+    #         d_grouped, 
+    #         x="Education_Level", 
+    #         y="Completion_Rate", 
+    #         color="Region",
+    #         color_discrete_sequence=px.colors.qualitative.Set2, barmode="group",
+    #         category_orders={"Education_Level": ["Primary", "Lower Secondary", "Upper Secondary"]},
+    #         labels={"Education_Level": "Education Level", "Completion_Rate": "Completion Rate (%)"},
+    #         range_y=[0,100]
+    #     )
 
-        return fig
+    #     return fig
+
 
     if qc is not None:
-        @render.download(filename="global_education_filtered.csv")
+        @render.download(filename="supserstore_filtered.csv")
         def download_chat_data():
             yield qc_vals.df().to_csv(index=False).encode("utf-8")
 

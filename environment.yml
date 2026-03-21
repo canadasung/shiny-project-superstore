@@ -1,4 +1,4 @@
-name: 'shiny-template'
+name: 'shiny-superstore'
 channels:
   - conda-forge
 dependencies:
