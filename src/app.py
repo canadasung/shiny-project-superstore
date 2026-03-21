@@ -98,10 +98,18 @@ app_ui = ui.page_fluid(
             ),
             ui.layout_sidebar(
                 ui.sidebar(
-                    ui.input_checkbox_group(
-                        "category",
-                        "Product Category",
-                        choices=[]
+                    ui.input_selectize(
+                        "group_cols",
+                        "Group Sales By (Select multiple):",
+                        # The dictionary keys are what the user sees, the values are the exact df column names
+                        choices={
+                            "category": "Category",
+                            "sub_category": "Sub-Category",
+                            "region": "Region",
+                            "state": "State"
+                        },
+                        multiple=True,
+                        selected=["category"] # Default starting state
                     )
                 ),
                 ui.output_table("table")
@@ -109,49 +117,49 @@ app_ui = ui.page_fluid(
         ),
 
         # --- Tab 2: Query with Chat ---
-        ui.nav_panel(
-            "Query with Chat",
-            # Show actived model name into the header!
-            ui.h2(f"AI-Powered Data Filtering (Powered by {ACTIVE_MODEL})"),
-            ui.layout_sidebar(
-                qc.sidebar() if qc else ui.sidebar(
-                    ui.card(
-                        ui.card_header("LLM Not Configured"),
-                        ui.p("To use the Query with Chat feature, configure an LLM client in your .env file:"),
-                        ui.tags.ul(
-                            ui.tags.li("Set ANTHROPIC_API_KEY for Claude"),
-                            ui.tags.li("Set GITHUB_TOKEN for GitHub Models"),
-                            ui.tags.li("Set USE_LOCAL_LLM=true for Ollama"),
-                        ),
-                    )
-                ),
-                ui.layout_column_wrap(
-                    ui.card(
-                        ui.card_header(
-                            ui.output_text("chat_title"),
-                            ui.download_button("download_chat_data", "Download CSV", class_="btn-success btn-sm") if qc else ui.div(),
-                                class_="d-flex justify-content-between align-items-center"
-                        ),
-                        ui.output_data_frame("chat_tbl"),
-                    ),
-                    # ui.layout_column_wrap(
-                    #     ui.card(
-                    #         ui.card_header("Literacy Rate Scatterplot (Filtered)"),
-                    #         output_widget("chat_scatter"),
-                    #     ),
-                    #     ui.card(
-                    #         ui.card_header("Avg Education Level by Region (Filtered)"),
-                    #         output_widget("chat_bar"),
-                    #     ),
-                    #     width=1/2
-                    # ),
-                    width=1,
-                    heights_equal="row"
-                ),
-                # Set layout to a fixed height,
-                height="80vh" 
-            )
-        )
+        # ui.nav_panel(
+        #     "Query with Chat",
+        #     # Show actived model name into the header!
+        #     ui.h2(f"AI-Powered Data Filtering (Powered by {ACTIVE_MODEL})"),
+        #     ui.layout_sidebar(
+        #         qc.sidebar() if qc else ui.sidebar(
+        #             ui.card(
+        #                 ui.card_header("LLM Not Configured"),
+        #                 ui.p("To use the Query with Chat feature, configure an LLM client in your .env file:"),
+        #                 ui.tags.ul(
+        #                     ui.tags.li("Set ANTHROPIC_API_KEY for Claude"),
+        #                     ui.tags.li("Set GITHUB_TOKEN for GitHub Models"),
+        #                     ui.tags.li("Set USE_LOCAL_LLM=true for Ollama"),
+        #                 ),
+        #             )
+        #         ),
+        #         ui.layout_column_wrap(
+        #             ui.card(
+        #                 ui.card_header(
+        #                     ui.output_text("chat_title"),
+        #                     ui.download_button("download_chat_data", "Download CSV", class_="btn-success btn-sm") if qc else ui.div(),
+        #                         class_="d-flex justify-content-between align-items-center"
+        #                 ),
+        #                 ui.output_data_frame("chat_tbl"),
+        #             ),
+        #             # ui.layout_column_wrap(
+        #             #     ui.card(
+        #             #         ui.card_header("Literacy Rate Scatterplot (Filtered)"),
+        #             #         output_widget("chat_scatter"),
+        #             #     ),
+        #             #     ui.card(
+        #             #         ui.card_header("Avg Education Level by Region (Filtered)"),
+        #             #         output_widget("chat_bar"),
+        #             #     ),
+        #             #     width=1/2
+        #             # ),
+        #             width=1,
+        #             heights_equal="row"
+        #         ),
+        #         # Set layout to a fixed height,
+        #         height="80vh" 
+        #     )
+        # )
     ),
 )
 
@@ -163,7 +171,7 @@ def server(input, output, session):
     # ----------------------------------------
     # TAB 1 LOGIC (Main Dashboard)
     # ----------------------------------------
-
+    @reactive.effect
     def _():
         categories = sorted(ss_data["category"].unique())
         ui.update_checkbox_group(
@@ -179,10 +187,38 @@ def server(input, output, session):
         req(input.category())
         return ss_data[ss_data["category"].isin(input.category())]
 
+    @reactive.calc
+    def dynamic_sales_agg():
+        # 1. Get the base filtered data (from your other reactive calc)
+        df = filtered_data()
+        
+        # 2. Grab the user's selected columns and ensure it is a list
+        cols_to_group = list(input.group_cols())
+        
+        # 3. EDGE CASE: If the user deletes all selections, grouping will crash.
+        # Handle this by returning the grand total, or an empty dataframe.
+        if len(cols_to_group) == 0:
+            return pd.DataFrame({"Global Total Sales": [df['sales'].sum()]})
+            
+        # 4. The Magic: Pass the dynamic list to groupby!
+        agg_df = df.groupby(cols_to_group, as_index=False)['sales'].sum()
+        
+        # 5. Sort the results so the highest sales are at the top
+        agg_df = agg_df.sort_values('sales', ascending=False)
+        
+        return agg_df
+
     @output
     @render.table
     def table():
         return filtered_data()
+
+    @output
+    @render.data_frame
+    def dynamic_table():
+        # This table will automatically add/remove columns 
+        # based on what the user picked in the selectize input!
+        return render.DataGrid(dynamic_sales_agg())
 
     # @reactive.Calc
     # def filtered_table():
@@ -206,60 +242,66 @@ def server(input, output, session):
     
     #     return table
 
-    # ----------------------------------------
-    # TAB 2 LOGIC (QueryChat)
-    # ----------------------------------------
-    if qc is not None:
-        qc_vals = qc.server()
+    ### ----------------------------------------
+    ### TAB 2 LOGIC (QueryChat)
+    ### ----------------------------------------
+    # @reactive.calc
+    # def table_height():
+    #     if qc is not None:
+    #         n_rows = len(qc_vals.df())
+    #         return f"{min(40 + n_rows * 30, 800)}px"
+    #     else:
+    #         return "250px" # Fallback height if LLM is disabled
 
-        @render.text
-        def chat_title():
-            return qc_vals.title() or "Superstore Dataset"
+    # if qc is not None:
+    #     qc_vals = qc.server()
 
-        @output
-        @render.data_frame
-        def chat_tbl():
-            d = qc_vals.df()
+    #     @render.text
+    #     def chat_title():
+    #         return qc_vals.title() or "Superstore Dataset"
 
-            # Drop the unwanted index column
+    #     @output
+    #     @render.data_frame
+    #     def chat_tbl():
+    #         d = qc_vals.df()
+
+    #         # Drop the unwanted index column
             
-            # Define categorical columns
-            cat_cols = ["state", "region", "city"]
+    #         # Define categorical columns
+    #         cat_cols = ["state", "region", "city"]
             
-            # Grab all the remaining numerical columns
-            num_cols = [c for c in d.columns if c not in cat_cols]
+    #         # Grab all the remaining numerical columns
+    #         num_cols = [c for c in d.columns if c not in cat_cols]
             
-            # Combine the lists to create final display order
-            final_order = cat_cols + num_cols
+    #         # Combine the lists to create final display order
+    #         final_order = cat_cols + num_cols
 
-            # Apply the order to the dataframe
-            valid_cols = [c for c in final_order if c in d.columns]
+    #         # Apply the order to the dataframe
+    #         valid_cols = [c for c in final_order if c in d.columns]
             
-            return render.DataGrid(
-                d[valid_cols], 
-                selection_mode="rows", 
-                height="250px"
-            )
-    else:
-        # Placeholder functions when QueryChat is not available
-        @render.text
-        def chat_title():
-            return "LLM Not Configured"
+    #         return render.DataGrid(
+    #             d[valid_cols], 
+    #             selection_mode="rows", 
+    #             height=table_height()
+    #         )
+    # else:
+    #     # Placeholder functions when QueryChat is not available
+    #     @render.text
+    #     def chat_title():
+    #         return "LLM Not Configured"
 
-        @output
-        @render.data_frame
-        def chat_tbl():
-            return render.DataGrid(
-                pd.DataFrame({"Message": ["Configure an LLM client to use this feature"]}),
-                height="250px"
-            )
+    #     @output
+    #     @render.data_frame
+    #     def chat_tbl():
+    #         return render.DataGrid(
+    #             pd.DataFrame({"Message": ["Configure an LLM client to use this feature"]}),
+    #             height=table_height()
+    #         )
 
-
-
-    if qc is not None:
-        @render.download(filename="supserstore_filtered.csv")
-        def download_chat_data():
-            yield qc_vals.df().to_csv(index=False).encode("utf-8")
+    # if qc is not None:
+    #     @render.download(filename="supserstore_filtered.csv")
+    #     def download_chat_data():
+    #         yield qc_vals.df().to_csv(index=False).encode("utf-8")
 
 
 app = App(app_ui, server)
