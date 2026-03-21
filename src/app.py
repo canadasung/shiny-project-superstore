@@ -1,4 +1,4 @@
-from shiny import App, ui, render, reactive
+from shiny import App, ui, render, reactive, req
 from shinywidgets import output_widget, render_widget, render_plotly
 from shinywidgets import render_altair
 import altair as alt
@@ -13,9 +13,6 @@ from querychat import QueryChat
 
 
 
-
-load_dotenv()
-
 # anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
 
 # ==========================================
@@ -23,7 +20,7 @@ load_dotenv()
 # ==========================================
 
 # Read data
-ss_data = pd.read_csv(Path(__file__).parent / "sample_superstore.csv").drop(columns=['Row ID'])
+ss_data = pd.read_csv(Path(__file__).parent.parent / "data/sample_superstore.csv", encoding="latin1").drop(columns=['Row ID'])
 ss_data.columns = ss_data.columns.str.lower().str.replace(' ', '_').str.replace('-', '_')
 # ss_data.columns = ss_data.columns.str.lower().str.replace(r'[ -]', '_', regex=True)
 
@@ -31,6 +28,9 @@ ss_data.columns = ss_data.columns.str.lower().str.replace(' ', '_').str.replace(
 
 # Initialize the correct Chatlas Client inside the server so it's safe for multi-users
 # Note: QueryChat requires a valid client, so we'll skip QueryChat initialization if no API key is available
+ENV_PATH = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=ENV_PATH)
+
 if os.environ.get("USE_LOCAL_LLM", "False").lower() == "true":
     llm_client = clt.ChatOllama(model="qwen3.5")
     ACTIVE_MODEL = "Local: Ollama (Qwen 3.5)"
@@ -52,15 +52,16 @@ print(f"\n---> LLM Status: {ACTIVE_MODEL} <---\n")
 
 # QueryChat Setup
 # Read greeting
-greeting_path = Path(__file__).parent / "greeting.md"
+greeting_path = Path(__file__).parent / "ai_greeting.md"
 GREETING = greeting_path.read_text(encoding="utf-8")
 
 # Read data description
-data_desc_path = Path(__file__).parent / "data_desc.md"
+data_desc_path = Path(__file__).parent / "ai_data_desc.md"
 DATA_DESC = data_desc_path.read_text(encoding="utf-8")
 
 # Add drop-down dashboard description
-dashboard_description = Path("src/dashboard_description.md").read_text(encoding="utf-8")
+dashboard_desc_path = Path(__file__).parent / "dashboard_description.md"
+dashboard_description = dashboard_desc_path.read_text(encoding="utf-8")
 
 # Only initialize QueryChat if we have a valid LLM client
 if llm_client is not None:
@@ -103,9 +104,7 @@ app_ui = ui.page_fluid(
                         choices=[]
                     )
                 ),
-                ui.main_panel(
-                    ui.output_table("table")
-                )
+                ui.output_table("table")
             ),
         ),
 
@@ -166,7 +165,7 @@ def server(input, output, session):
     # ----------------------------------------
 
     def _():
-        categories = sorted(ss_data["Category"].unique())
+        categories = sorted(ss_data["category"].unique())
         ui.update_checkbox_group(
             "category",
             choices=categories,
@@ -177,8 +176,8 @@ def server(input, output, session):
     # 1) 
     @reactive.calc
     def filtered_data():
-        reactive.req(input.category())
-        return superstore[superstore["Category"].isin(input.category())]
+        req(input.category())
+        return ss_data[ss_data["category"].isin(input.category())]
 
     @output
     @render.table
