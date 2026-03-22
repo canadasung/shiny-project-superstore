@@ -98,10 +98,14 @@ app_ui = ui.page_fluid(
             ),
             ui.layout_sidebar(
                 ui.sidebar(
+                    ui.input_checkbox_group(
+                        "category",
+                        "Select Categories:",
+                        choices=[], # Will be populated by the server
+                    ),
                     ui.input_selectize(
                         "group_cols",
                         "Group Sales By (Select multiple):",
-                        # The dictionary keys are what the user sees, the values are the exact df column names
                         choices={
                             "category": "Category",
                             "sub_category": "Sub-Category",
@@ -109,10 +113,15 @@ app_ui = ui.page_fluid(
                             "state": "State"
                         },
                         multiple=True,
-                        selected=["category"] # Default starting state
+                        selected=["category"]
                     )
                 ),
-                ui.output_table("table")
+                ui.navset_tab(
+                    ui.nav_panel(
+                        "Sales Table",
+                        ui.output_data_frame("dynamic_table")
+                    )
+                ),
             ),
         ),
 
@@ -172,7 +181,8 @@ def server(input, output, session):
     # TAB 1 LOGIC (Main Dashboard)
     # ----------------------------------------
     @reactive.effect
-    def _():
+    def update_categories():
+        # Populate the checkbox choices on startup
         categories = sorted(ss_data["category"].unique())
         ui.update_checkbox_group(
             "category",
@@ -180,38 +190,36 @@ def server(input, output, session):
             selected=categories
         )
 
-
-    # 1) 
     @reactive.calc
     def filtered_data():
+        # Require that categories are selected before proceeding
         req(input.category())
         return ss_data[ss_data["category"].isin(input.category())]
 
     @reactive.calc
     def dynamic_sales_agg():
-        # 1. Get the base filtered data (from your other reactive calc)
         df = filtered_data()
         
-        # 2. Grab the user's selected columns and ensure it is a list
+        # Ensure it's a list (it usually is from input_selectize with multiple=True)
         cols_to_group = list(input.group_cols())
         
-        # 3. EDGE CASE: If the user deletes all selections, grouping will crash.
-        # Handle this by returning the grand total, or an empty dataframe.
-        if len(cols_to_group) == 0:
+        if not cols_to_group:
             return pd.DataFrame({"Global Total Sales": [df['sales'].sum()]})
             
-        # 4. The Magic: Pass the dynamic list to groupby!
         agg_df = df.groupby(cols_to_group, as_index=False)['sales'].sum()
-        
-        # 5. Sort the results so the highest sales are at the top
         agg_df = agg_df.sort_values('sales', ascending=False)
         
         return agg_df
 
     @output
-    @render.table
-    def table():
-        return filtered_data()
+    @render.data_frame
+    def dynamic_table():
+        return render.DataGrid(dynamic_sales_agg())
+
+    # @output
+    # @render.table
+    # def table():
+    #     return filtered_data()
 
     @output
     @render.data_frame
