@@ -16,3 +16,4 @@ python-dotenv==1.2.2
 querychat==0.5.1
 ibis-framework[duckdb]>=9.0.0
 pyarrow>=14.0.0
+altair==6.0.0
