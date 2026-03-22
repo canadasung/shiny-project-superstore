@@ -11,21 +11,14 @@ import chatlas as clt
 from dotenv import load_dotenv
 from querychat import QueryChat
 
-
+# Read data
+from data_loader import ss_data, min_date, max_date
 
 # anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
 
 # ==========================================
 #   SETUP & DATA LOADING
 # ==========================================
-
-# Read data
-ss_data = pd.read_csv(Path(__file__).parent.parent / "data/sample_superstore.csv", encoding="latin1").drop(columns=['Row ID'])
-ss_data.columns = ss_data.columns.str.lower().str.replace(' ', '_').str.replace('-', '_')
-# ss_data.columns = ss_data.columns.str.lower().str.replace(r'[ -]', '_', regex=True)
-
-
-
 # Initialize the correct Chatlas Client inside the server so it's safe for multi-users
 # Note: QueryChat requires a valid client, so we'll skip QueryChat initialization if no API key is available
 ENV_PATH = Path(__file__).parent / ".env"
@@ -86,7 +79,10 @@ app_ui = ui.page_fluid(
         # --- Tab 1: Main Dashboard ---
         ui.nav_panel(
             "Main Dashboard",
-            ui.h2("Superstore Dashboard"),
+            ui.h2(
+                "Superstore Dashboard", 
+                style="background-color: #2c4750; color: white; padding: 15px; border-radius: 5px;"
+            ),
             ui.accordion(
                 ui.accordion_panel(
                     "Click to learn more about this dashboard.",
@@ -167,8 +163,8 @@ app_ui = ui.page_fluid(
         #         ),
         #         # Set layout to a fixed height,
         #         height="80vh" 
-        #     )
-        # )
+        #     ),
+        # ),
     ),
 )
 
@@ -214,19 +210,22 @@ def server(input, output, session):
     @output
     @render.data_frame
     def dynamic_table():
-        return render.DataGrid(dynamic_sales_agg())
+        df = dynamic_sales_agg()
+        display_df = df.copy()
+        
+        if 'sales' in display_df.columns:
+            display_df['sales'] = display_df['sales'].apply(lambda x: f"${x:,.2f}")
+
+        elif 'Global Total Sales' in display_df.columns:
+            display_df['Global Total Sales'] = display_df['Global Total Sales'].apply(lambda x: f"${x:,.2f}")
+
+        return render.DataGrid(display_df)
 
     # @output
     # @render.table
     # def table():
     #     return filtered_data()
 
-    @output
-    @render.data_frame
-    def dynamic_table():
-        # This table will automatically add/remove columns 
-        # based on what the user picked in the selectize input!
-        return render.DataGrid(dynamic_sales_agg())
 
     # @reactive.Calc
     # def filtered_table():
