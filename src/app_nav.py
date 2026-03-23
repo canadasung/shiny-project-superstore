@@ -2,6 +2,7 @@ from shiny import App, ui, render, reactive, req
 from shinywidgets import output_widget, render_widget, render_plotly
 from shinywidgets import render_altair
 import altair as alt
+from vega_datasets import data
 import os
 from pathlib import Path
 import pandas as pd
@@ -26,8 +27,8 @@ ENV_PATH = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path=ENV_PATH)
 
 if os.environ.get("USE_LOCAL_LLM", "False").lower() == "true":
-    llm_client = clt.ChatOllama(model="qwen3.5")
-    ACTIVE_MODEL = "Local: Ollama (Qwen 3.5)"
+    llm_client = clt.ChatOllama(model="llama3.1:8b")
+    ACTIVE_MODEL = "Local: Ollama (llama 3.1 8B)"
     
 elif os.environ.get("GITHUB_TOKEN"):
     llm_client = clt.ChatGithub(model="gpt-4o-mini")
@@ -118,13 +119,14 @@ app_ui = ui.page_navbar(
                     "group_cols",
                     "Group Sales By (Select multiple):",
                     choices={
+                        "region": "Region",
+                        "state": "State",                        
+                        "segment": "Segment",
                         "category": "Category",
                         "sub_category": "Sub-Category",
-                        "region": "Region",
-                        "state": "State"
                     },
                     multiple=True,
-                    selected=["category"]
+                    selected=["region"]
                 ),
                 ui.input_checkbox_group(
                     "category",
@@ -144,13 +146,79 @@ app_ui = ui.page_navbar(
                         ),
                         open=False
                     ),
-                    # ui.card(
-                    #     ui.card_header("Aggregated Data Table"),
-                    #     ui.output_data_frame("dynamic_table")
-                    # ),
+                    ui.div(
+                        {"class": "fixed-main-header"},
+                        # KPI and Summary
+                        ui.layout_columns(
+                            ui.value_box(
+                                "Total Sales",
+                                ui.div(
+                                    ui.output_text("total_sales_agg"),
+                                    ui.div(
+                                        {"style": "font-size:12px; color:gray;"},
+                                        ui.output_ui("total_sales_change"),
+                                    ),
+                                ),
+                            ),
+                            ui.value_box(
+                                "Total Profits",
+                                ui.div(
+                                    ui.output_text("total_profit_agg"),
+                                    ui.div(
+                                        {"style": "font-size:12px; color:gray;"},
+                                        ui.output_ui("total_profit_change"),
+                                    ),
+                                ),
+                            ),
+                            ui.value_box(
+                                "Total Orders",
+                                ui.div(
+                                    ui.output_text("total_order_agg"),
+                                    ui.div(
+                                        {"style": "font-size:12px;"},
+                                        ui.output_text("total_order_change"),
+                                    ),
+                                ),
+                                # theme="bg-success text-white",
+                            ),
+                            ui.value_box(
+                                "Highest Avg Sales State",
+                                ui.div(
+                                    ui.output_text("kpi_max_state"),
+                                    ui.div(
+                                        {"style": "font-size:12px;"},
+                                        ui.output_text("kpi_max_note"),
+                                    ),
+                                ),
+                                # theme="bg-danger text-white",
+                            ),
+                            # ADDED: KPI — MOST COMMON CRIME
+                            ui.card(
+                                ui.h5("Most Sold Product"), ui.output_text("kpi_most_common")
+                            ),
+                        ),
+                    ),
+                    ui.hr(),
                     ui.card(
-                        ui.card_header("Visual Sales Breakdown"),
-                        output_widget("sales_chart") # Notice we use output_widget for Altair!
+                        ui.h5("Sales Map"),
+                        output_widget("map_chart")
+                    ),
+                    ui.hr(),
+                    ui.layout_columns(
+                        ui.column(
+                            12,
+                            ui.card(
+                                ui.card_header("Visual Sales Breakdown"),
+                                output_widget("sales_chart") # Notice we use output_widget for Altair!
+                            ),
+                        ),
+                        # ui.column(
+                        #     12,
+                        #     ui.card(
+                        #         ui.card_header("Visual Sales Breakdown"),
+                        #         output_widget("sales_chart") # Notice we use output_widget for Altair!
+                        #     ),
+                        # ),
                     ),
                 ),
                 ui.nav_panel(
@@ -167,41 +235,41 @@ app_ui = ui.page_navbar(
     ),
 
     # --- Tab 2: Query with Chat ---
-    # ui.nav_panel(
-    #     "Query with Chat",
-    #     ui.layout_sidebar(
-    #         qc.sidebar() if qc else ui.sidebar(
-    #             ui.card(
-    #                 ui.card_header("LLM Not Configured"),
-    #                 ui.p("To use the Query with Chat feature, configure an LLM client in your .env file:"),
-    #                 ui.tags.ul(
-    #                     ui.tags.li("Set ANTHROPIC_API_KEY for Claude"),
-    #                     ui.tags.li("Set GITHUB_TOKEN for GitHub Models"),
-    #                     ui.tags.li("Set USE_LOCAL_LLM=true for Ollama"),
-    #                 ),
-    #             )
-    #         ),
-    #         # Show actived model name into the header!
-    #         ui.h2(
-    #             f"AI-Powered Data Filtering (Powered by {ACTIVE_MODEL})",
-    #             class_="fs-6 mt-3 mb-4",
-    #         ),
-    #         ui.layout_column_wrap(
-    #             ui.card(
-    #                 ui.card_header(
-    #                     ui.output_text("chat_title"),
-    #                     ui.download_button("download_chat_data", "Download CSV", class_="btn-success btn-sm") if qc else ui.div(),
-    #                         class_="d-flex justify-content-between align-items-center"
-    #                 ),
-    #                 ui.output_data_frame("chat_tbl"),
-    #             ),
-    #             width=1,
-    #             heights_equal="row"
-    #         ),
-    #         # Set layout to a fixed height,
-    #         height="80vh" 
-    #     )
-    # ),
+    ui.nav_panel(
+        "Query with Chat",
+        ui.layout_sidebar(
+            qc.sidebar() if qc else ui.sidebar(
+                ui.card(
+                    ui.card_header("LLM Not Configured"),
+                    ui.p("To use the Query with Chat feature, configure an LLM client in your .env file:"),
+                    ui.tags.ul(
+                        ui.tags.li("Set ANTHROPIC_API_KEY for Claude"),
+                        ui.tags.li("Set GITHUB_TOKEN for GitHub Models"),
+                        ui.tags.li("Set USE_LOCAL_LLM=true for Ollama"),
+                    ),
+                )
+            ),
+            # Show actived model name into the header!
+            ui.h2(
+                f"AI-Powered Data Filtering (Powered by {ACTIVE_MODEL})",
+                class_="fs-6 mt-3 mb-4",
+            ),
+            ui.layout_column_wrap(
+                ui.card(
+                    ui.card_header(
+                        ui.output_text("chat_title"),
+                        ui.download_button("download_chat_data", "Download CSV", class_="btn-success btn-sm") if qc else ui.div(),
+                            class_="d-flex justify-content-between align-items-center"
+                    ),
+                    ui.output_data_frame("chat_tbl"),
+                ),
+                width=1,
+                heights_equal="row"
+            ),
+            # Set layout to a fixed height,
+            height="80vh" 
+        )
+    ),
 
     # --- Global Navbar Settings ---
     title="Superstore Dashboard",
@@ -222,6 +290,15 @@ def server(input, output, session):
     # ----------------------------------------
     # TAB 1 LOGIC (Main Dashboard)
     # ----------------------------------------
+    @reactive.calc
+    def cleaned_data():
+        ss_data_clean = ss_data.copy().drop(columns=['row_id', 'ship_date', 'ship_mode', 'customer_name'])
+        cat_cols = ss_data_clean.select_dtypes(include=['object', 'category']).columns.tolist()
+        # if want to exclude specific column
+        # cat_cols = [col for col in cat_cols if col not in ['order_id', 'customer_id', 'product_id']]
+
+        return ss_data_clean, cat_cols
+    
     @reactive.effect
     def update_categories():
         # Populate the checkbox choices on startup
@@ -234,6 +311,7 @@ def server(input, output, session):
 
     @reactive.calc
     def filtered_data():
+        df, cat_cols = cleaned_data()
         # Require that categories are selected before proceeding
         req(input.category(), input.daterange1())
 
@@ -243,15 +321,72 @@ def server(input, output, session):
         end_date = pd.to_datetime(end_date)
 
         mask = (
-            ss_data["category"].isin(input.category()) & 
-            (ss_data['order_date'] >= start_date) & 
-            (ss_data['order_date'] <= end_date)
+            df["category"].isin(input.category()) & 
+            (df['order_date'] >= start_date) & 
+            (df['order_date'] <= end_date)
         )
-        return ss_data[mask]
+        return df[mask]
+
+    @output
+    @render.text
+    def total_sales_agg():
+        df = filtered_data().copy()
+        sales_total_agg = df['sales'].sum()
+
+        return f"{sales_total_agg:,}"
+    
+    @output
+    @render.ui
+    def total_sales_change():
+        df = filtered_data().copy()
+        sales_total_change = df['sales'].sum()
+
+        
+        return f"{sales_total_change:,}"
+
+    @output
+    @render.text
+    def total_profit_agg():
+        df = filtered_data().copy()
+        profit_total_agg = df['profit'].sum()
+
+        return f"{profit_total_agg:,}"
+    
+    @output
+    @render.ui
+    def total_profit_change():
+        df = filtered_data().copy()
+        profit_total_change = df['profit'].sum()
+
+        
+        return f"{profit_total_change:,}"
+    
+    @output
+    @render.text
+    def total_order_agg():
+        df = filtered_data().copy()
+        if 'order_id' in df.columns:
+            order_total_agg = df['order_id'].nunique()
+        else:
+            order_total_agg = len(df)
+
+        return f"{order_total_agg:,}"
+    
+    @output
+    @render.text
+    def total_order_change():
+        df = filtered_data().copy()
+        if 'order_id' in df.columns:
+            order_total_change = df['order_id'].nunique()
+        else:
+            order_total_change = len(df)
+
+        
+        return f"{order_total_change:,}"
 
     @reactive.calc
     def dynamic_sales_agg():
-        df = filtered_data()
+        df = filtered_data().copy()
         
         # Ensure it's a list (it usually is from input_selectize with multiple=True)
         cols_to_group = list(input.group_cols())
@@ -283,6 +418,70 @@ def server(input, output, session):
     def raw_data_table():
         d = ss_data.copy()
         return render.DataGrid(d)
+
+    @output
+    @render_altair
+    def map_chart():
+        df = filtered_data().copy()
+        
+        # Handle empty data case
+        if df.empty:
+            return alt.Chart(pd.DataFrame({'msg': ['No data available']})) \
+                      .mark_text(size=16, color='gray') \
+                      .encode(text='msg:N') \
+                      .properties(height=400)
+
+        # 2. Aggregate sales strictly by state
+        state_sales = df.groupby('state', as_index=False)['sales'].sum()
+
+        # 3. Map state names to FIPS ID codes for the geographic plot
+        state_fips = {
+            'Alabama': 1, 'Alaska': 2, 'Arizona': 4, 'Arkansas': 5, 'California': 6,
+            'Colorado': 8, 'Connecticut': 9, 'Delaware': 10, 'District of Columbia': 11,
+            'Florida': 12, 'Georgia': 13, 'Hawaii': 15, 'Idaho': 16, 'Illinois': 17,
+            'Indiana': 18, 'Iowa': 19, 'Kansas': 20, 'Kentucky': 21, 'Louisiana': 22,
+            'Maine': 23, 'Maryland': 24, 'Massachusetts': 25, 'Michigan': 26,
+            'Minnesota': 27, 'Mississippi': 28, 'Missouri': 29, 'Montana': 30,
+            'Nebraska': 31, 'Nevada': 32, 'New Hampshire': 33, 'New Jersey': 34,
+            'New Mexico': 35, 'New York': 36, 'North Carolina': 37, 'North Dakota': 38,
+            'Ohio': 39, 'Oklahoma': 40, 'Oregon': 41, 'Pennsylvania': 42, 'Rhode Island': 44,
+            'South Carolina': 45, 'South Dakota': 46, 'Tennessee': 47, 'Texas': 48,
+            'Utah': 49, 'Vermont': 50, 'Virginia': 51, 'Washington': 53, 'West Virginia': 54,
+            'Wisconsin': 55, 'Wyoming': 56
+        }
+        
+        # Apply the mapping
+        state_sales['id'] = state_sales['state'].map(state_fips)
+        state_sales = state_sales.dropna(subset=['id'])
+
+        # 4. Load the Altair US map geometry
+        states_topo = alt.topo_feature(data.us_10m.url, 'states')
+
+        # 5. Build the map
+        chart = alt.Chart(states_topo).mark_geoshape(
+            stroke='white',     # Adds a clean white border between states
+            strokeWidth=0.5
+        ).encode(
+            color=alt.Color(
+                'sales:Q', 
+                title='Total Sales (USD)', 
+                scale=alt.Scale(scheme='tealblues') # Matches your dashboard's color scheme
+            ),
+            tooltip=[
+                alt.Tooltip('state:N', title='State'),
+                alt.Tooltip('sales:Q', title='Total Sales', format='$,.2f')
+            ]
+        ).transform_lookup(
+            lookup='id',
+            from_=alt.LookupData(state_sales, 'id', ['sales', 'state'])
+        ).project(
+            type='albersUsa' # Automatically moves AK and HI to the bottom left
+        ).properties(
+            height=400
+        )
+
+        return chart
+
 
     @output
     @render_altair
@@ -331,63 +530,63 @@ def server(input, output, session):
     ### ----------------------------------------
     ### TAB 2 LOGIC (QueryChat)
     ### ----------------------------------------
-    # @reactive.calc
-    # def table_height():
-    #     if qc is not None:
-    #         n_rows = len(qc_vals.df())
-    #         return f"{min(40 + n_rows * 30, 800)}px"
-    #     else:
-    #         return "250px" # Fallback height if LLM is disabled
+    @reactive.calc
+    def table_height():
+        if qc is not None:
+            n_rows = len(qc_vals.df())
+            return f"{min(40 + n_rows * 30, 800)}px"
+        else:
+            return "250px" # Fallback height if LLM is disabled
 
-    # if qc is not None:
-    #     qc_vals = qc.server()
+    if qc is not None:
+        qc_vals = qc.server()
 
-    #     @render.text
-    #     def chat_title():
-    #         return qc_vals.title() or "Superstore Dataset"
+        @render.text
+        def chat_title():
+            return qc_vals.title() or "Superstore Dataset"
 
-    #     @output
-    #     @render.data_frame
-    #     def chat_tbl():
-    #         d = qc_vals.df()
+        @output
+        @render.data_frame
+        def chat_tbl():
+            d = qc_vals.df()
 
-    #         # Drop the unwanted index column
+            # Drop the unwanted index column
             
-    #         # Define categorical columns
-    #         cat_cols = ["state", "region", "city"]
+            # Define categorical columns
+            cat_cols = ["state", "region", "city"]
             
-    #         # Grab all the remaining numerical columns
-    #         num_cols = [c for c in d.columns if c not in cat_cols]
+            # Grab all the remaining numerical columns
+            num_cols = [c for c in d.columns if c not in cat_cols]
             
-    #         # Combine the lists to create final display order
-    #         final_order = cat_cols + num_cols
+            # Combine the lists to create final display order
+            final_order = cat_cols + num_cols
 
-    #         # Apply the order to the dataframe
-    #         valid_cols = [c for c in final_order if c in d.columns]
+            # Apply the order to the dataframe
+            valid_cols = [c for c in final_order if c in d.columns]
             
-    #         return render.DataGrid(
-    #             d[valid_cols], 
-    #             selection_mode="rows", 
-    #             height=table_height()
-    #         )
-    # else:
-    #     # Placeholder functions when QueryChat is not available
-    #     @render.text
-    #     def chat_title():
-    #         return "LLM Not Configured"
+            return render.DataGrid(
+                d[valid_cols], 
+                selection_mode="rows", 
+                height=table_height()
+            )
+    else:
+        # Placeholder functions when QueryChat is not available
+        @render.text
+        def chat_title():
+            return "LLM Not Configured"
 
-    #     @output
-    #     @render.data_frame
-    #     def chat_tbl():
-    #         return render.DataGrid(
-    #             pd.DataFrame({"Message": ["Configure an LLM client to use this feature"]}),
-    #             height=table_height()
-    #         )
+        @output
+        @render.data_frame
+        def chat_tbl():
+            return render.DataGrid(
+                pd.DataFrame({"Message": ["Configure an LLM client to use this feature"]}),
+                height=table_height()
+            )
 
-    # if qc is not None:
-    #     @render.download(filename="supserstore_filtered.csv")
-    #     def download_chat_data():
-    #         yield qc_vals.df().to_csv(index=False).encode("utf-8")
+    if qc is not None:
+        @render.download(filename="supserstore_filtered.csv")
+        def download_chat_data():
+            yield qc_vals.df().to_csv(index=False).encode("utf-8")
 
 
 app = App(app_ui, server)

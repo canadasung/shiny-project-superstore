@@ -6,9 +6,8 @@ def load_superstore_data():
     file_path = Path(__file__).parent.parent / "data/sample_superstore.csv"
     
     # Read the data
-    df = pd.read_csv(file_path, encoding="latin1").drop(columns=[
-        'Row ID', 'Ship Date', 'Ship Mode', 'Customer Name'
-    ])
+    df = pd.read_csv(file_path, encoding="latin1")
+    # .drop(columns=['Row ID', 'Ship Date', 'Ship Mode', 'Customer Name'])
     
     # Clean the column names
     df.columns = df.columns.str.lower().str.replace(' ', '_').str.replace('-', '_')
